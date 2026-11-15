@@ -1,0 +1,33 @@
+ame: Build Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications @capacitor/assets
+      - run: npx cap add android
+      - run: npx capacitor-assets generate --android
+        continue-on-error: true
+      - run: npx cap sync android
+      - name: Permissoes de notificacao
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          for P in POST_NOTIFICATIONS SCHEDULE_EXACT_ALARM USE_EXACT_ALARM RECEIVE_BOOT_COMPLETED; do
+            grep -q "$P" $M || sed -i "s#<application#<uses-permission android:name=\"android.permission.$P\" />\n    <application#" $M
+          done
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agenda-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
